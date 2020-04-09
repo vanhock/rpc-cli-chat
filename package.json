@@ -7,14 +7,9 @@
     "client": "node client/index.js"
   },
   "dependencies": {
-    "cookie-parser": "~1.4.4",
     "crypto-js": "^4.0.0",
     "debug": "~2.6.9",
-    "express": "~4.16.1",
-    "express-ws": "^4.0.0",
-    "get-port": "^5.1.1",
     "inquirer": "^7.1.0",
-    "morgan": "~1.9.1",
     "ws": "^7.2.3"
   }
 }

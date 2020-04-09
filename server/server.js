@@ -1,6 +1,8 @@
 const WebSocket = require("ws");
 const port = 3000;
-const wss = new WebSocket.Server({ port: port });
+const wss = new WebSocket.Server({
+  port: port
+});
 wss.on("connection", function connection(ws, req, client) {
   ws.isAlive = true;
   ws.on("pong", heartbeat);

@@ -1,5 +1,4 @@
 const errorCodes = require("../errorCodes");
-const { generateRandom } = require("../helpers");
 const clients = [];
 
 const send = (ws, data) => {
@@ -54,8 +53,13 @@ module.exports = (ws, wss, WebSocket) => {
         break;
 
       case "sendKey":
-        const recipientWS = getRecipient(params.recipientId).ws;
-        if (!params.recipientId || !params.publicKey) {
+        const targetRecipient = getRecipient(params.recipientId);
+        if (
+          !params.recipientId ||
+          !params.publicKey ||
+          !targetRecipient ||
+          !targetRecipient.ws
+        ) {
           send(ws, {
             id: id,
             error: {
@@ -65,7 +69,7 @@ module.exports = (ws, wss, WebSocket) => {
           });
           break;
         }
-        send(recipientWS, {
+        send(targetRecipient.ws, {
           method: "sendKey",
           params: {
             recipientId: sender.id,

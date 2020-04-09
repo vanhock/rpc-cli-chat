@@ -32,12 +32,10 @@ const getPublicKey = privateKey => {
 };
 
 const encrypt = (text, secret) => {
-  console.log(`secret: ${secret}`)
   return AES.encrypt(text, secret).toString()
 };
 
 const decrypt = (text, secret) => {
-  console.log(`secret: ${secret}`)
   const bytes = AES.decrypt(text, secret);
   return bytes.toString(Utf8);
 };
