@@ -10,30 +10,33 @@ const send = (ws, data) => {
   ws.send(d);
 };
 
-const setRecipients = ws => {
-  return clients.filter(c => c.ws !== ws).map(c => c.id);
+const getRecipient = recipientId => {
+  return clients.find(client => client.id === recipientId);
 };
 
-module.exports = ws => {
+module.exports = (ws, wss, WebSocket) => {
+  ws.on("close", () => {
+    console.log("Client disconnected");
+  });
+
   ws.on("message", msg => {
     const { method, id, params } = JSON.parse(msg);
-    const sender = clients.find(client => client.ws == ws);
+    const sender = clients.find(client => client.ws === ws);
     switch (method) {
       case "login":
-        if (clients.some(client => client.name === params.name)) {
+        if (clients.some(client => client.id === params.id)) {
           if (id)
             send(ws, {
               id: id,
               error: {
                 code: errorCodes.login,
-                message: "Client name is taken"
+                message: "Client id is taken"
               }
             });
           break;
         }
         const client = {
-          name: params.name,
-          id: generateRandom(1)
+          id: params.id
         };
         clients.push({
           ...client,
@@ -45,12 +48,39 @@ module.exports = ws => {
             id: id,
             result: {
               status: "success",
-              client: client,
-              recipients: setRecipients(ws)
+              client: client
             }
           });
         break;
 
+      case "sendKey":
+        const recipientWS = getRecipient(params.recipientId).ws;
+        if (!params.recipientId || !params.publicKey) {
+          send(ws, {
+            id: id,
+            error: {
+              code: errorCodes.message,
+              message: "Wrong recipient data!"
+            }
+          });
+          break;
+        }
+        send(recipientWS, {
+          method: "sendKey",
+          params: {
+            recipientId: sender.id,
+            publicKey: params.publicKey
+          }
+        });
+        break;
+      case "handshake":
+        send(getRecipient(params.recipientId).ws, {
+          method: "handshake",
+          params: {
+            recipientId: sender.id
+          }
+        });
+        break;
       case "message":
         if (!params.recipient) {
           if (id)
@@ -63,14 +93,14 @@ module.exports = ws => {
             });
           break;
         }
-        if (params.recipient === -1) {
+        if (params.recipient === "-1") {
           /** Send to all clients **/
           let sentCount = 0;
-          clients.forEach(client => {
-            if (client.id !== sender.id) {
-              send(client.ws, {
+          wss.clients.forEach(function each(client) {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
+              send(client, {
                 method: "message",
-                params: { message: params.message, name: sender.name }
+                params: { message: params.message, senderId: sender.id }
               });
               ++sentCount;
             }
@@ -93,14 +123,18 @@ module.exports = ws => {
               id: id,
               error: {
                 code: errorCodes.message,
-                message: "Can not find client by name"
+                message: "Can not find client by id"
               }
             });
           break;
         }
         send(recipient.ws, {
           method: "message",
-          params: { message: params.message, name: sender.name }
+          params: {
+            message: params.message,
+            senderId: sender.id,
+            recipientId: recipient.id
+          }
         });
         send(ws, {
           id: id,
@@ -110,12 +144,6 @@ module.exports = ws => {
           }
         });
         break;
-
-      case "recipients":
-        send(ws, {
-          id: id,
-          result: { status: "success", recipients: setRecipients(ws) }
-        });
     }
   });
 };
