@@ -7,6 +7,10 @@ const generateRandom = bytes => {
   return crypto.randomBytes(bytes).toString("hex");
 };
 
+const getKeyByValue = (object, value) => {
+  return Object.keys(object).find(key => object[key] === value);
+};
+
 const powMod = (base, exp, modulus) => {
   base %= modulus;
   result = 1;
@@ -46,5 +50,6 @@ module.exports = {
   getPrivateKey,
   getPublicKey,
   encrypt,
-  decrypt
+  decrypt,
+  getKeyByValue
 };

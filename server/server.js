@@ -3,11 +3,21 @@ const port = 3000;
 const wss = new WebSocket.Server({
   port: port
 });
+const router = require("./wsRouter");
+const clients = [];
+
 wss.on("connection", function connection(ws, req, client) {
+  ws.on("close", () => {
+    console.log("Client disconnected");
+  });
+
+  ws.on("message", msg => {
+    router({clients, msg, ws, wss})
+  });
+
   ws.isAlive = true;
   ws.on("pong", heartbeat);
-  console.log(`Connected on port: ${port}`);
-  require("./controller.js")(ws, wss, WebSocket);
+  console.log(`Client connected: ${req.connection.remoteAddress}`);
 });
 
 const interval = setInterval(function ping() {

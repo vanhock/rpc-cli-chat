@@ -1,9 +1,15 @@
-const { generateRandom, encrypt, decrypt } = require("../helpers.js");
+const {
+  generateRandom,
+  getKeyByValue,
+  encrypt,
+  decrypt
+} = require("../helpers.js");
+const serverSocketURL = "ws://localhost:3000";
 const inquirer = require("inquirer");
 const WebSocket = require("ws");
-
 const participant = require("./participant");
-const serverSocketURL = "ws://localhost:3000";
+
+const ws = new WebSocket(serverSocketURL, undefined, undefined);
 
 const recipients = {};
 const client = {
@@ -45,7 +51,7 @@ const send = (method, params, cb) => {
 };
 
 const login = () => {
-  return send("login", { id: generateRandom(1) });
+  return send("login");
 };
 
 const sendPublicKey = recipientId => {
@@ -95,19 +101,9 @@ const newMessage = recipient => {
   });
 };
 
-const ws = new WebSocket(serverSocketURL, undefined, undefined);
-ws.on("open", function open() {
-  console.log("connected");
-  login();
-});
-
-ws.on("close", function close() {
-  console.log("disconnected");
-});
-
-ws.on("message", function incoming(message) {
-  const response = JSON.parse(message);
+const handler = response => {
   const { id, method, result, params, error } = response;
+
   if (error) {
     console.log(error.message);
     return error.code === 1
@@ -116,9 +112,9 @@ ws.on("message", function incoming(message) {
         ? chooseRecipient()
         : "";
   }
-  /** Messages **/
-  switch (method) {
-    case "message":
+
+  const methods = {
+    message: () => {
       let decryptedMessage = params.message;
       if (params.message && params.recipientId) {
         decryptedMessage = decrypt(
@@ -136,8 +132,8 @@ ws.on("message", function incoming(message) {
         `${decryptedMessage}`
       );
       chooseRecipient();
-      break;
-    case "sendKey":
+    },
+    sendKey: () => {
       console.log(`key received by ${client.id}`);
       if (!recipients.hasOwnProperty(params.recipientId)) {
         addRecipient(params.recipientId);
@@ -145,28 +141,50 @@ ws.on("message", function incoming(message) {
       if (!recipients[params.recipientId].secret) {
         generateSecret(params.recipientId, params.publicKey);
         sendPublicKey(params.recipientId);
-        break;
+        return;
       }
       if (recipients[params.recipientId].secret) {
         send("handshake", { recipientId: params.recipientId });
       }
       chooseRecipient();
-      break;
-    case "handshake":
+    },
+    handshake: () => {
       console.log(`handshake received by ${client.id}`);
       newMessage(recipients[params.recipientId]);
-      break;
-  }
-  /** Callbacks **/
-  switch (id) {
-    case client.requests["login"]:
+    }
+  };
+
+  const callback = {
+    login: () => {
       console.log(`Hi ${result.client.id}!`);
       client.id = result.client.id;
       chooseRecipient();
-      break;
-    case client.requests["message"]:
+    },
+    message: () => {
       console.log(result.message);
       chooseRecipient();
-      break;
+    }
+  };
+
+  if (method) {
+    return methods[method]();
   }
+  const request = getKeyByValue(client.requests, id);
+  if (request) {
+    callback[request]();
+  }
+};
+
+ws.on("open", function open() {
+  console.log("connected");
+  login();
+});
+
+ws.on("close", function close() {
+  console.log("disconnected");
+});
+
+ws.on("message", function incoming(message) {
+  const response = JSON.parse(message);
+  handler(response);
 });
